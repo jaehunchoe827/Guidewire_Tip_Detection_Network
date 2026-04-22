@@ -5,8 +5,8 @@ import random
 import numpy as np
 import torch
 from torch.utils import data
-from augmentation import pixel_coords as aug_functions
-from utils.standardization import standardize_image, destandardize_image
+from gwtd.augmentation import pixel_coords as aug_functions
+from gwtd.utils.standardization import standardize_image, destandardize_image
 
 
 class GuidewireDataSet(data.Dataset):

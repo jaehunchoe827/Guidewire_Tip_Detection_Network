@@ -12,8 +12,8 @@ project_root = os.path.dirname(script_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from nets import nn
-from utils import training_utils
+from gwtd.nets import nn
+from gwtd.utils import training_utils
 
 
 def main():

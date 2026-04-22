@@ -1,7 +1,7 @@
 import math
 import torch
 import copy
-from utils.util import make_anchors, load_weight
+from gwtd.utils.util import make_anchors, load_weight
 
 def fuse_conv(conv, norm):
     fused_conv = torch.nn.Conv2d(conv.in_channels,

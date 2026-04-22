@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>gwtd</name>
+  <version>0.0.1</version>
+  <description>guidewire tip detection.</description>
+  <maintainer email="jaehunchoe827@gmmail.com">Jaehun Choe</maintainer>
+  <license>TODO: License declaration</license>
+
+  <depend>rclpy</depend>
+  
+  <build_depend>ament_cmake_python</build_depend>
+
+  <exec_depend>ament_cmake_python</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

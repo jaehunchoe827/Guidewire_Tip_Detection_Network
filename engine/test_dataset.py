@@ -13,9 +13,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 
-from augmentation import pixel_coords as aug_functions
-from data_loader.guidewire_data_loader import GuidewireDataSet, GuidewireDataPreprocessor
-from utils import util
+from gwtd.augmentation import pixel_coords as aug_functions
+from gwtd.data_loader.guidewire_data_loader import GuidewireDataSet, GuidewireDataPreprocessor
+from gwtd.utils import util
 
 
 def visualize_sample(dataset: GuidewireDataSet, index: int, output_image_name: str):

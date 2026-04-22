@@ -1,3 +1,4 @@
+import sys
 import numpy
 import torch
 import random
@@ -77,6 +78,14 @@ def load_weight(model, ckpt_path):
     Mismatched shapes/keys are skipped.
     """
     dst_state = model.state_dict()
+
+    # Register old bare module names as aliases so torch.load can unpickle
+    # weight files that were saved under the original module paths.
+    import gwtd.nets as _nets_pkg
+    import gwtd.nets.nn as _nn_mod
+    sys.modules.setdefault('nets', _nets_pkg)
+    sys.modules.setdefault('nets.nn', _nn_mod)
+
     obj = torch.load(ckpt_path, map_location='cpu', weights_only=False)
 
     # Extract source state_dict from various formats

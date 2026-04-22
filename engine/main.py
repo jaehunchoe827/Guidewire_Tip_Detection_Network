@@ -10,19 +10,19 @@ import numpy as np
 import warnings
 from argparse import ArgumentParser
 from torch.utils import data
-from data_loader.guidewire_data_loader import GuidewireDataPreprocessor, GuidewireDataSet
-from utils import training_utils
-from loss.loss import GuidewireHeatMapLoss
+from gwtd.data_loader.guidewire_data_loader import GuidewireDataPreprocessor, GuidewireDataSet
+from gwtd.utils import training_utils
+from gwtd.loss.loss import GuidewireHeatMapLoss
 
 # Add project root to Python path for model loading
-script_dir = os.path.dirname(os.path.abspath(__file__))
+script_dir = os.path.dirname(os.path.realpath(__file__))
 project_root = os.path.dirname(script_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from nets import nn
-from utils import util
-from utils import training_utils
+from gwtd.nets import nn
+from gwtd.utils import util
+from gwtd.utils import training_utils
 
 
 def train(config):
@@ -386,7 +386,11 @@ def main():
 
     args = parser.parse_args()
 
-    config_path = os.path.join(project_root, 'config', args.config)
+    config_path = os.path.join(project_root, 'gwtd', 'config', args.config)
+    if not config_path.endswith('.yaml'):
+        config_path = config_path + '.yaml'
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config file not found: {config_path}")
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
