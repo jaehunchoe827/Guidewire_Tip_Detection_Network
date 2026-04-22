@@ -3,6 +3,7 @@ import sys
 import yaml
 import torch
 import numpy as np
+from typing import Optional, Dict, List
 
 # Add project root to Python path for model loading
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -12,12 +13,13 @@ if PROJECT_ROOT not in sys.path:
 
 from gwtd.nets import nn
 from gwtd.utils import util
+from gwtd.utils.standardization import IMAGE_MEAN, IMAGE_STD
 
 class GuidewireTipDetector:
     def __init__(
         self,
-        max_batch_size: int = 10,
         config_file_name: str,
+        max_batch_size: int = 20,
         sigma_xray_noise: Optional[float] = None,
     ):
         self.config_file_name = config_file_name
@@ -75,6 +77,8 @@ class GuidewireTipDetector:
             'tip_positions': peak pixel positions of the predicted probability heatmaps
         """
         images = np.array(images, dtype=np.float32)
+        if images.max() > 1.0:
+            images /= 255.0
         # check the shape and prepare for the network: (B, 1, H, W)
         if images.ndim == 2:
             # (H, W) -> (1, 1, H, W)
@@ -83,42 +87,41 @@ class GuidewireTipDetector:
             # (H, W, C) — color axis is last
             if images.shape[-1] == 1:
                 images = images.transpose(2, 0, 1)[np.newaxis, :, :, :]
-            elif images.shape[-1] == 3:
-                images = np.mean(images, axis=-1)
-                images = images[np.newaxis, np.newaxis, :, :]
             else:
-                raise ValueError(f"Invalid color channels: {images.shape[-1]}")
+                raise ValueError(f"Expected grayscale image with 1 channel, got {images.shape[-1]} channels")
         elif images.ndim == 4:
             # (B, H, W, C) — color axis is last
             if images.shape[-1] == 1:
                 images = images.transpose(0, 3, 1, 2)
-            elif images.shape[-1] == 3:
-                images = np.mean(images, axis=-1, keepdims=True)
-                images = images.transpose(0, 3, 1, 2)
             else:
-                raise ValueError(f"Invalid color channels: {images.shape[-1]}")
+                raise ValueError(f"Expected grayscale images with 1 channel, got {images.shape[-1]} channels")
         else:
             raise ValueError(f"Invalid image dimensions: {images.ndim}")
 
-        images = torch.from_numpy(images).cuda()
-        # resize to network input shape if needed
+        images = (images - IMAGE_MEAN[0]) / IMAGE_STD[0]
+
+        images = torch.from_numpy(images)
         target_h, target_w = self.input_image_shape
         if images.shape[2] != target_h or images.shape[3] != target_w:
             images = torch.nn.functional.interpolate(
                 images, size=(target_h, target_w), mode='bilinear', align_corners=False
             )
-        # predict in sub-batches
+        images = images.cuda()
+
         preds_list = []
         for i in range(0, images.shape[0], self.max_batch_size):
             sub_batch = images[i:i + self.max_batch_size]
             with torch.no_grad():
                 with torch.amp.autocast(device_type='cuda'):
-                    preds_list.append(self.model(sub_batch).cpu().numpy())
-        preds_np = np.concatenate(preds_list, axis=0)
+                    preds_list.append(self.model(sub_batch))
 
+        preds = torch.cat(preds_list, dim=0)
+        if self.config['from_logits']:
+            preds = torch.sigmoid(preds)
+        preds_np = preds.cpu().numpy()
         # calculate the peak pixel position of the predicted probability heatmaps
-        # preds_np shape: (B, 1, H, W)
-        B, _, H, W = preds_np.shape
+        # preds_np shape: (B, H, W)
+        B, H, W = preds_np.shape
         flat = preds_np.reshape(B, -1)
         peak_indices = flat.argmax(axis=1)
         peak_y = (peak_indices // W).astype(np.float32) / H
