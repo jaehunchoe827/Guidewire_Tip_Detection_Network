@@ -16,19 +16,19 @@ from gwtd.utils import util
 class GuidewireTipDetector:
     def __init__(
         self,
+        max_batch_size: int = 10,
         config_file_name: str,
         sigma_xray_noise: Optional[float] = None,
     ):
         self.config_file_name = config_file_name
         self.sigma_xray_noise = sigma_xray_noise
+        self.max_batch_size = max_batch_size
         self.config = self.load_config()
         self.model = None
         self.initialize()
 
     def load_config(self):
-        if not self.config_file_name.endswith('.yaml'):
-            self.config_file_name = self.config_file_name + '.yaml'
-        config_file_path = os.path.join(PROJECT_ROOT, 'gwtd', 'config', self.config_file_name)
+        config_file_path = os.path.join(PROJECT_ROOT, 'results', self.config_file_name, 'config.yaml')
         if not os.path.exists(config_file_path):
             raise FileNotFoundError(f"Config file not found: {config_file_path}")
         with open(config_file_path, 'r') as f:
@@ -107,11 +107,14 @@ class GuidewireTipDetector:
             images = torch.nn.functional.interpolate(
                 images, size=(target_h, target_w), mode='bilinear', align_corners=False
             )
-        # predict
-        with torch.no_grad():
-            with torch.amp.autocast(device_type='cuda'):
-                preds = self.model(images)
-        preds_np = preds.cpu().numpy()
+        # predict in sub-batches
+        preds_list = []
+        for i in range(0, images.shape[0], self.max_batch_size):
+            sub_batch = images[i:i + self.max_batch_size]
+            with torch.no_grad():
+                with torch.amp.autocast(device_type='cuda'):
+                    preds_list.append(self.model(sub_batch).cpu().numpy())
+        preds_np = np.concatenate(preds_list, axis=0)
 
         # calculate the peak pixel position of the predicted probability heatmaps
         # preds_np shape: (B, 1, H, W)
