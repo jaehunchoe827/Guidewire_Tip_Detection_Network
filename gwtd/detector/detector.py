@@ -76,25 +76,22 @@ class GuidewireTipDetector:
             'heatmaps': predicted probability heatmaps
             'tip_positions': peak pixel positions of the predicted probability heatmaps
         """
+        # normalize the image and convert to float32 if not already
         images = np.array(images, dtype=np.float32)
         if images.max() > 1.0:
             images /= 255.0
-        # check the shape and prepare for the network: (B, 1, H, W)
-        if images.ndim == 2:
-            # (H, W) -> (1, 1, H, W)
-            images = images[np.newaxis, np.newaxis, :, :]
-        elif images.ndim == 3:
+        if images.ndim == 3:
             # (H, W, C) — color axis is last
-            if images.shape[-1] == 1:
-                images = images.transpose(2, 0, 1)[np.newaxis, :, :, :]
-            else:
-                raise ValueError(f"Expected grayscale image with 1 channel, got {images.shape[-1]} channels")
+            if not images.shape[-1] == 3:
+                raise ValueError(f"Expected color image with 3 channels, got {images.shape[-1]} channels")
+            # convert to (1, C, H, W)
+            images = images.transpose(2, 0, 1)[np.newaxis, :, :, :]
         elif images.ndim == 4:
             # (B, H, W, C) — color axis is last
-            if images.shape[-1] == 1:
-                images = images.transpose(0, 3, 1, 2)
-            else:
-                raise ValueError(f"Expected grayscale images with 1 channel, got {images.shape[-1]} channels")
+            if not images.shape[-1] == 3:
+                raise ValueError(f"Expected color image with 3 channels, got {images.shape[-1]} channels")
+            # convert to (B, C, H, W)
+            images = images.transpose(0, 3, 1, 2)
         else:
             raise ValueError(f"Invalid image dimensions: {images.ndim}")
 
