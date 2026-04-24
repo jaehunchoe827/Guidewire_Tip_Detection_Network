@@ -1,0 +1,113 @@
+backbone: "yolo11m"
+from_logits: true
+
+# lower weight decay
+# change optimizer to AdamW
+
+training:
+  # note that the epoch starts from 1
+  epochs: 30
+  batch_size: 8
+  accumulate: 3 # accumulate over 4 batches
+  unfreeze_backbone_epochs: 3 # unfreeze backbone at the start of this epoch
+  loss_main: ["bce", "mse"]
+  loss_weights:
+    bce: 0.9
+    mse: 0.1
+  optimizer:
+    name: "AdamW"
+    weight_decay: 0.00001
+    args:
+  max_grad_norm: 10.0 # relaxed from 1.0
+  lr_scheduler:
+    # possible options: CosineLR, LinearLR, ExponentialLR, StepLR, DoubleCosineLR
+    name: "CosineLR"
+    args:
+      warmup_epochs: 0.5 # warmup epochs (warm up during these epochs)
+      min_lr: 0.000003  # initial learning rate
+      max_lr: 0.003  # maximum learning rate
+      
+network:
+  input_image_shape: [640, 640] # height, width
+  head:
+    version: "ver3"
+    num_hidden_channels: 96
+    use_se: True
+    edge_assist: True
+
+# Data augmentation for training.
+# They are executed in the order below.
+dataset:
+  image_initial_resize_ratio: 0.8
+  split_ratio: [0.8, 0.1, 0.1] # train, val, test
+  heatmap_sigma: 4.0
+  sigma_xray_noise: 0.025
+  augmentation:
+    random_brightness:
+      probability: 0.3
+      args:
+        brightness_factor_range: [-0.2, 0.2]
+    random_horizontal_flip:
+      probability: 0.3
+      args:
+    random_vertical_flip:
+      probability: 0.3
+      args:
+    random_scale_intensity:
+      probability: 0.3
+      args:
+        scale_factor_range: [0.8, 1.2]
+    random_saturation:
+      probability: 0.3
+      args:
+        saturation_factor_range: [0.8, 1.2]
+    random_hue_shift:
+      probability: 0.3
+      args:
+        hue_shift_range: [-0.05, 0.05]
+    random_gaussian_sharpness:
+      probability: 0.3
+      args:
+        kernel_size: 5
+        sigma_range: [-1.5, 1.5]
+    random_elastic_deformation:
+      probability: 0.3
+      args:
+        alpha_range: [0.0, 0.004]
+        sigma: 1.0
+    random_perspective:
+      probability: 0.3
+      args:
+        perspective_factor_range: [-0.05, 0.05]
+    random_resize:
+      probability: 0.3
+      args:
+        width_range: [0.8, 1.2]
+        height_range: [0.8, 1.2]
+    random_shear:
+      probability: 0.3
+      args:
+        shear_x_range: [-0.05, 0.05]
+        shear_y_range: [-0.05, 0.05]
+    random_rotation:
+      probability: 0.5
+      args:
+        angle_range: [-3.14159, 3.14159] # radians
+    random_crop:
+      probability: 0.3
+      args:
+        safe_reigon: 0.1
+    random_mosaic:
+      probability: 0.3
+      args:
+        mosaic_size_range: [0.05, 0.2]
+        max_num_mosaics: 2
+    random_cutout:
+      probability: 0.3
+      args:
+        cutout_size_range: [0.05, 0.2]
+        max_num_cutouts: 2
+    random_gaussian_noise:
+      probability: 1.0
+      args:
+        sigma_range: [0.0, 0.1]

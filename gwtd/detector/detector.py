@@ -66,15 +66,25 @@ class GuidewireTipDetector:
         util.load_weight(model, weights_path)
         self.model = model
 
-    def predict(self, images: List[np.ndarray]) -> Dict[str, np.ndarray]:
+    def predict(self, images: List[np.ndarray], gray_conversion_method: str = 'opencv') -> Dict[str, np.ndarray]:
         """
         Predict the guidewire tip from a list of images.
         Args:
-            images: List[np.ndarray] -> list of images to predict
+            images: List[np.ndarray] -> list of BGR color images (as produced by
+                cv2.VideoCapture / cv2.imread). Values may be uint8 or float32
+                in [0, 1]; either is accepted.
+            gray_conversion_method: str -> how to collapse BGR to a single channel
+                before feeding the model.
+                - 'opencv': BT.601 luma, Y = 0.114*B + 0.587*G + 0.299*R
+                  (matches cv2.cvtColor(..., cv2.COLOR_BGR2GRAY)).
+                - 'mean':   simple arithmetic mean across B, G, R channels.
         Returns:
             Dict[str, np.ndarray] -> dictionary of predictions
             'heatmaps': predicted probability heatmaps
             'tip_positions': peak pixel positions of the predicted probability heatmaps
+            'gray_noised': per-image gray + gaussian-noise arrays at the INPUT
+                resolution, float32 in [0, 1], shape (B, H, W). Useful for
+                visualizing what was fed to the network.
         """
         # normalize the image and convert to float32 if not already
         images = np.array(images, dtype=np.float32)
@@ -95,7 +105,29 @@ class GuidewireTipDetector:
         else:
             raise ValueError(f"Invalid image dimensions: {images.ndim}")
 
-        images = (images - IMAGE_MEAN[0]) / IMAGE_STD[0]
+        # images is now (B, 3, H, W), BGR ordering, float32 in [0, 1]
+
+        # convert to gray -> (B, 1, H, W)
+        if gray_conversion_method == 'opencv':
+            # BT.601 luma for BGR input: 0.114 B + 0.587 G + 0.299 R
+            bgr_weights = np.array([0.114, 0.587, 0.299], dtype=np.float32).reshape(1, 3, 1, 1)
+            gray = (images * bgr_weights).sum(axis=1, keepdims=True)
+        elif gray_conversion_method == 'mean':
+            gray = images.mean(axis=1, keepdims=True)
+        else:
+            raise ValueError(
+                f"Unknown gray_conversion_method: {gray_conversion_method!r} "
+                f"(expected 'opencv' or 'mean')"
+            )
+
+        # apply gaussian noise
+        noise = np.random.normal(0, self.sigma_xray_noise, gray.shape).astype(np.float32)
+        gray_noised = np.clip(gray + noise, 0, 1).astype(np.float32)
+
+        # keep a copy (B, H, W) for callers that want to visualize the network input
+        gray_noised_out = gray_noised[:, 0, :, :].copy()
+
+        images = (gray_noised - IMAGE_MEAN[0]) / IMAGE_STD[0]
 
         images = torch.from_numpy(images)
         target_h, target_w = self.input_image_shape
@@ -127,7 +159,8 @@ class GuidewireTipDetector:
 
         predictions = {
             'heatmaps': preds_np,
-            'tip_positions': peak_positions
+            'tip_positions': peak_positions,
+            'gray_noised': gray_noised_out,
         }
 
         return predictions
