@@ -161,28 +161,12 @@ class GuidewireHeatMapLoss:
         target_y = target_argmax // width
         target_x = target_argmax % width
         
-        # Calculate accuracy for each sample
-        accuracies = []
-        for i in range(batch_size):
-            # Get peak positions for this sample
-            out_y, out_x = output_y[i].item(), output_x[i].item()
-            tgt_y, tgt_x = target_y[i].item(), target_x[i].item()
-            
-            # Calculate window boundaries centered at target peak
-            window_y_min = tgt_y - window_height / 2.0
-            window_y_max = tgt_y + window_height / 2.0
-            window_x_min = tgt_x - window_width / 2.0
-            window_x_max = tgt_x + window_width / 2.0
-            
-            # Check if output peak is within the window
-            if (window_y_min <= out_y <= window_y_max and 
-                window_x_min <= out_x <= window_x_max):
-                accuracies.append(1.0)
-            else:
-                accuracies.append(0.0)
-        
-        # Convert to tensor
-        accuracies = torch.tensor(accuracies, dtype=torch.float32, device=outputs.device)
+        # Vectorized window check: equivalent to the previous per-sample
+        # (tgt - w/2) <= out <= (tgt + w/2) bound check in both axes.
+        dy = (output_y - target_y).abs().to(torch.float32)
+        dx = (output_x - target_x).abs().to(torch.float32)
+        inside = (dy <= window_height / 2.0) & (dx <= window_width / 2.0)
+        accuracies = inside.to(torch.float32)
         
         # Apply reduction
         if reduction == 'mean':

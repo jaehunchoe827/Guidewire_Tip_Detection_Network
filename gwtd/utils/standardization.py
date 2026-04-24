@@ -5,32 +5,34 @@ IMAGE_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 def standardize_image(image):
     """
-    Standardize the image using mean and std
-    Args:
-        image: numpy array of shape (height, width, channels)
-    Returns:
-        standardized image: numpy array of shape (height, width, channels)
+    Standardize the image using mean and std.
+
+    Accepts either:
+      - (height, width, 3) RGB image, or
+      - (height, width, 1) or (height, width) grayscale image.
+    Returns the image with the same shape.
     """
-    if image.shape[2] == 3:
+    if image.ndim == 3 and image.shape[2] == 3:
         # RGB image
         image = (image - IMAGE_MEAN) / IMAGE_STD
     else:
-        # Grayscale image
+        # Grayscale image (2D or 3D with 1 channel)
         image = (image - IMAGE_MEAN[0]) / IMAGE_STD[0]
     return image
 
 def destandardize_image(image):
     """
-    Destandardize the image using mean and std
-    Args:
-        image: numpy array of shape (height, width, channels)
-    Returns:
-        destandardized image: numpy array of shape (height, width, channels)
+    Destandardize the image using mean and std.
+
+    Accepts either:
+      - (height, width, 3) RGB image, or
+      - (height, width, 1) or (height, width) grayscale image.
+    Returns the image with the same shape.
     """
-    if image.shape[2] == 3:
+    if image.ndim == 3 and image.shape[2] == 3:
         # RGB image
         image = image * IMAGE_STD + IMAGE_MEAN
     else:
-        # Grayscale image
+        # Grayscale image (2D or 3D with 1 channel)
         image = image * IMAGE_STD[0] + IMAGE_MEAN[0]
     return image

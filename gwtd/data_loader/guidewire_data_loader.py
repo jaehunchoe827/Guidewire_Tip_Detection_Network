@@ -71,14 +71,10 @@ class GuidewireDataSet(data.Dataset):
     def collate_fn(batch):
         images, labels = zip(*batch)
 
-        # Ensure NumPy arrays are C-contiguous and correct dtype before from_numpy.
-        imgs_np = [np.ascontiguousarray(img, dtype=np.float32) for img in images]
-
-        # (B, H, W, C) -> (B, C, H, W)
-        images_tensor = torch.stack([
-            torch.from_numpy(img).permute(2, 0, 1).contiguous()
-            for img in imgs_np
-        ], dim=0)
+        # Single numpy stack -> (B, H, W) contiguous, then one from_numpy +
+        # unsqueeze to get (B, 1, H, W) without extra copies.
+        images_np = np.stack(images, axis=0).astype(np.float32, copy=False)
+        images_tensor = torch.from_numpy(images_np).unsqueeze_(1)
 
         # labels: this should work for both pixel coord and heatmap coord
         labels_tensor = torch.stack([
