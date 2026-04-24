@@ -6,7 +6,7 @@ from_logits: true
 
 training:
   # note that the epoch starts from 1
-  epochs: 30
+  epochs: 20
   batch_size: 8
   accumulate: 3 # accumulate over 4 batches
   unfreeze_backbone_epochs: 3 # unfreeze backbone at the start of this epoch
