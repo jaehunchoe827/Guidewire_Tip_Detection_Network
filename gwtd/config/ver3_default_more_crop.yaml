@@ -44,70 +44,70 @@ dataset:
   sigma_xray_noise: 0.025
   augmentation:
     random_brightness:
-      probability: 0.2
+      probability: 0.3
       args:
         brightness_factor_range: [-0.2, 0.2]
     random_horizontal_flip:
-      probability: 0.2
+      probability: 0.3
       args:
     random_vertical_flip:
-      probability: 0.2
+      probability: 0.3
       args:
     random_scale_intensity:
-      probability: 0.2
+      probability: 0.3
       args:
         scale_factor_range: [0.8, 1.2]
     random_saturation:
-      probability: 0.2
+      probability: 0.3
       args:
         saturation_factor_range: [0.8, 1.2]
     random_hue_shift:
-      probability: 0.2
+      probability: 0.3
       args:
         hue_shift_range: [-0.05, 0.05]
     random_gaussian_sharpness:
-      probability: 0.2
+      probability: 0.3
       args:
         kernel_size: 5
         sigma_range: [-1.5, 1.5]
     random_elastic_deformation:
-      probability: 0.2
+      probability: 0.3
       args:
         alpha_range: [0.0, 0.004]
         sigma: 1.0
     random_perspective:
-      probability: 0.2
+      probability: 0.3
       args:
         perspective_factor_range: [-0.05, 0.05]
     random_resize:
-      probability: 0.2
+      probability: 0.3
       args:
         width_range: [0.8, 1.2]
         height_range: [0.8, 1.2]
     random_shear:
-      probability: 0.2
+      probability: 0.3
       args:
         shear_x_range: [-0.05, 0.05]
         shear_y_range: [-0.05, 0.05]
     random_rotation:
-      probability: 0.4
+      probability: 0.5
       args:
         angle_range: [-3.14159, 3.14159] # radians
     random_crop:
-      probability: 0.2
+      probability: 0.6
       args:
-        safe_reigon: 0.1
+        safe_reigon: 0.05
     random_mosaic:
-      probability: 0.2
+      probability: 0.3
       args:
         mosaic_size_range: [0.05, 0.2]
         max_num_mosaics: 2
     random_cutout:
-      probability: 0.2
+      probability: 0.3
       args:
         cutout_size_range: [0.05, 0.2]
         max_num_cutouts: 2
     random_gaussian_noise:
-      probability: 0.8
+      probability: 1.0
       args:
         sigma_range: [0.0, 0.1]
