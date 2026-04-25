@@ -31,7 +31,7 @@ network:
   input_image_shape: [640, 640] # height, width
   head:
     version: "ver3"
-    num_hidden_channels: 144
+    num_hidden_channels: 128
     use_se: True
     edge_assist: True
 

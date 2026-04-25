@@ -20,7 +20,7 @@ class GuidewireTipDetector:
     def __init__(
         self,
         config_file_name: str,
-        max_batch_size: int = 10,
+        max_batch_size: int = 8,
         sigma_xray_noise: Optional[float] = None,
     ):
         self.config_file_name = config_file_name
