@@ -1,9 +1,51 @@
+import math
+from copy import deepcopy
+
 import torch
 import numpy as np
 import matplotlib
 # Use a non-interactive backend to avoid Tkinter initialization in forked processes
 matplotlib.use('Agg', force=True)
 import matplotlib.pyplot as plt
+
+
+class ModelEMA:
+    """Exponential Moving Average of model parameters and buffers.
+
+    Maintains a shadow copy of the model on the same device. The decay
+    follows a warmup ramp `decay * (1 - exp(-step / tau))` so the EMA
+    tracks the model closely early in training and smooths more aggressively
+    later.
+
+    Floating-point parameters and buffers (e.g. BatchNorm running stats) are
+    EMA-updated. Integer buffers (e.g. `num_batches_tracked`) are copied
+    directly from the live model.
+    """
+
+    def __init__(self, model, decay=0.9999, tau=2000):
+        self.ema = deepcopy(self._unwrap(model)).eval()
+        for p in self.ema.parameters():
+            p.requires_grad_(False)
+        self.updates = 0
+        self.decay_base = decay
+        self.tau = tau
+        self.decay_fn = lambda step: decay * (1.0 - math.exp(-step / tau))
+
+    @staticmethod
+    def _unwrap(model):
+        return model.module if hasattr(model, 'module') else model
+
+    @torch.no_grad()
+    def update(self, model):
+        self.updates += 1
+        d = self.decay_fn(self.updates)
+        msd = self._unwrap(model).state_dict()
+        for k, v in self.ema.state_dict().items():
+            if v.dtype.is_floating_point:
+                v.mul_(d).add_(msd[k].detach(), alpha=1.0 - d)
+            else:
+                v.copy_(msd[k])
+
 
 def generate_optimizer(model, optimizer_config):
     optimizer_name = optimizer_config['name'].lower()

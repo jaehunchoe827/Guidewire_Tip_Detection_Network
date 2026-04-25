@@ -38,6 +38,18 @@ def train(config):
     model.freeze_backbone()
     profile_model(model, config['network']['input_image_shape'])
 
+    # Optional EMA shadow model. Disabled by default for backward compatibility:
+    # any config without `use_ema: true` runs identically to before.
+    ema = None
+    if config.get('use_ema', False):
+        ema_cfg = config.get('ema', {}) or {}
+        ema = training_utils.ModelEMA(
+            model,
+            decay=ema_cfg.get('decay', 0.9999),
+            tau=ema_cfg.get('tau', 2000),
+        )
+        print(f"EMA enabled (decay={ema.decay_base}, tau={ema.tau})")
+
     # setup
     epochs = config['training']['epochs']
     batch_size = config['training']['batch_size']
@@ -170,6 +182,8 @@ def train(config):
                     amp_scale.step(optimizer)
                     amp_scale.update()
                     optimizer.zero_grad()
+                    if ema is not None:
+                        ema.update(model)
 
                 # log
                 current_lr = optimizer.param_groups[0]['lr']
@@ -196,56 +210,71 @@ def train(config):
                 global_step += 1
 
             # Validation at end of epoch
-            model.eval()
-            val_losses_sum = {}
-            num_val_batches = max(1, len(val_loader))
-            with torch.no_grad():
-                for x_val, y_val in val_loader:
-                    x_val = x_val.cuda(non_blocking=True)
-                    y_val = y_val.cuda(non_blocking=True)
-                    # for validation, we disable AMP to avoid precision issues
-                    with torch.amp.autocast(device_type='cuda'):
-                        pred_val = model(x_val)
-                    val_losses = criterion(pred_val, y_val)
-                    
-                    # Accumulate validation losses
-                    for loss_name, loss_value in val_losses.items():
-                        if loss_name not in val_losses_sum:
-                            val_losses_sum[loss_name] = 0.0
-                        val_losses_sum[loss_name] += float(loss_value.item())
-            
-            # Calculate average validation losses
-            val_losses_avg = {loss_name: loss_sum / num_val_batches 
-                             for loss_name, loss_sum in val_losses_sum.items()}
-            
-            # Calculate weighted total validation loss
-            val_loss_total = 0.0
-            for loss_name in config['training']['loss_main']:
-                if loss_name in val_losses_avg and loss_name in config['training']['loss_weights']:
-                    val_loss_total += config['training']['loss_weights'][loss_name] * val_losses_avg[loss_name]
-            
+            def _run_validation(eval_model):
+                eval_model.eval()
+                losses_sum = {}
+                n_batches = max(1, len(val_loader))
+                with torch.no_grad():
+                    for x_val, y_val in val_loader:
+                        x_val = x_val.cuda(non_blocking=True)
+                        y_val = y_val.cuda(non_blocking=True)
+                        with torch.amp.autocast(device_type='cuda'):
+                            pred_val = eval_model(x_val)
+                        val_losses = criterion(pred_val, y_val)
+                        for loss_name, loss_value in val_losses.items():
+                            if loss_name not in losses_sum:
+                                losses_sum[loss_name] = 0.0
+                            losses_sum[loss_name] += float(loss_value.item())
+                losses_avg = {ln: ls / n_batches for ln, ls in losses_sum.items()}
+                total = 0.0
+                for loss_name in config['training']['loss_main']:
+                    if loss_name in losses_avg and loss_name in config['training']['loss_weights']:
+                        total += config['training']['loss_weights'][loss_name] * losses_avg[loss_name]
+                return losses_avg, total
+
+            val_losses_avg, val_loss_total = _run_validation(model)
+            ema_val_losses_avg, ema_val_loss_total = (None, None)
+            if ema is not None:
+                ema_val_losses_avg, ema_val_loss_total = _run_validation(ema.ema)
+
             print(f"Epoch {epoch}/{epochs} - val_loss_total: {val_loss_total:.6f}, "
                   f"val_acc1: {val_losses_avg.get('1%_win_acc', 0):.5f}, "
                   f"val_dist: {val_losses_avg.get('dist', 0):.5f}")
+            if ema is not None:
+                print(f"Epoch {epoch}/{epochs} - ema_val_loss_total: {ema_val_loss_total:.6f}, "
+                      f"ema_val_acc1: {ema_val_losses_avg.get('1%_win_acc', 0):.5f}, "
+                      f"ema_val_dist: {ema_val_losses_avg.get('dist', 0):.5f}")
 
             # Log validation losses to CSV
             if not val_headers_written:
-                # Write headers dynamically based on available losses
                 val_csv_headers = ['epoch', 'val_loss_total'] + list(val_losses_avg.keys())
+                if ema is not None:
+                    val_csv_headers += ['ema_val_loss_total'] + [
+                        f'ema_{ln}' for ln in ema_val_losses_avg.keys()
+                    ]
                 val_writer.writerow(val_csv_headers)
                 val_headers_written = True
-            
+
             val_csv_row = [epoch, val_loss_total]
             for loss_name, loss_value in val_losses_avg.items():
                 val_csv_row.append(loss_value)
+            if ema is not None:
+                val_csv_row.append(ema_val_loss_total)
+                for loss_name, loss_value in ema_val_losses_avg.items():
+                    val_csv_row.append(loss_value)
             val_writer.writerow(val_csv_row)
 
-            # Save best checkpoint based on total validation loss
-            one_percent_win_acc = val_losses_avg.get('1%_win_acc', 0)
+            # Save best checkpoint by 1%_win_acc. When EMA is enabled, the EMA
+            # model is the published artifact and drives both selection and
+            # the saved state_dict.
+            score_source = ema_val_losses_avg if ema is not None else val_losses_avg
+            one_percent_win_acc = score_source.get('1%_win_acc', 0)
             if one_percent_win_acc > best_score:
                 best_score = one_percent_win_acc
+                state_to_save = (ema.ema.state_dict()
+                                 if ema is not None else model.state_dict())
                 ckpt = {
-                    'model': model.state_dict(),
+                    'model': state_to_save,
                     'epoch': epoch,
                     'score': best_score,
                     'config': config,

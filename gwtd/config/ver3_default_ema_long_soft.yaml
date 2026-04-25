@@ -1,12 +1,15 @@
 backbone: "yolo11m"
 from_logits: true
 
-# lower weight decay
-# change optimizer to AdamW
+use_ema: true
+ema:
+  decay: 0.9999
+  tau: 2000   # warmup steps for the decay ramp
+  validate_raw: true   # log both raw and EMA val metrics each epoch
 
 training:
   # note that the epoch starts from 1
-  epochs: 30
+  epochs: 45
   batch_size: 8
   accumulate: 3 # accumulate over 4 batches
   unfreeze_backbone_epochs: 3 # unfreeze backbone at the start of this epoch
@@ -26,7 +29,7 @@ training:
       warmup_epochs: 1.5 # warmup epochs (warm up during these epochs)
       min_lr: 0.000003  # initial learning rate
       max_lr: 0.003  # maximum learning rate
-      
+
 network:
   input_image_shape: [640, 640] # height, width
   head:
@@ -119,4 +122,4 @@ dataset:
     random_gaussian_noise:
       probability: 1.0
       args:
-        sigma_range: [0.0, 0.1]
+        sigma_range: [0.0, 0.07]

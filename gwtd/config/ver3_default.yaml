@@ -1,9 +1,6 @@
 backbone: "yolo11m"
 from_logits: true
 
-# lower weight decay
-# change optimizer to AdamW
-
 training:
   # note that the epoch starts from 1
   epochs: 30
@@ -16,7 +13,7 @@ training:
     mse: 0.1
   optimizer:
     name: "AdamW"
-    weight_decay: 0.00001
+    weight_decay: 0.0001
     args:
   max_grad_norm: 10.0 # relaxed from 1.0
   lr_scheduler:
