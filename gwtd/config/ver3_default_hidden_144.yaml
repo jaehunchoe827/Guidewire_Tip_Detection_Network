@@ -6,7 +6,7 @@ from_logits: true
 
 training:
   # note that the epoch starts from 1
-  epochs: 20
+  epochs: 30
   batch_size: 8
   accumulate: 3 # accumulate over 4 batches
   unfreeze_backbone_epochs: 3 # unfreeze backbone at the start of this epoch
@@ -23,7 +23,7 @@ training:
     # possible options: CosineLR, LinearLR, ExponentialLR, StepLR, DoubleCosineLR
     name: "CosineLR"
     args:
-      warmup_epochs: 0.5 # warmup epochs (warm up during these epochs)
+      warmup_epochs: 1.5 # warmup epochs (warm up during these epochs)
       min_lr: 0.000003  # initial learning rate
       max_lr: 0.003  # maximum learning rate
       
@@ -31,7 +31,7 @@ network:
   input_image_shape: [640, 640] # height, width
   head:
     version: "ver3"
-    num_hidden_channels: 96
+    num_hidden_channels: 144
     use_se: True
     edge_assist: True
 

@@ -124,13 +124,16 @@ class GuidewireHeatMapLoss:
         """
             Loss percentage window accuracy:
             output and target both must be 2D heatmap.
-            The accuracy for one sameple is 1 when the peak pixel position(argmax)
-            of the output is within the window from the peak pixel position of the target.
-            The window is centered at the peak pixel position of the target, and
-            the width of the window is window_size * width of the heatmap,
-            and the height of the window is window_size * height of the heatmap
-            If the peak pixel position of the output is not within the window
-            from the peak pixel position of the target, the accuracy is 0.
+            The accuracy for one sample is 1 when the peak pixel position (argmax)
+            of the output lies within a circular window around the peak pixel
+            position of the target, and 0 otherwise.
+            The window is a disk centered at the peak pixel position of the target
+            with radius r = (window_height + window_width) / 2, where
+            window_width = window_size * width of the heatmap and
+            window_height = window_size * height of the heatmap.
+            Equivalently, the sample is accurate iff
+                dx^2 + dy^2 <= r^2
+            where (dx, dy) is the pixel offset between the output and target peaks.
             If reduction is 'mean', return the mean of the accuracy.
             If reduction is 'sum', return the sum of the accuracy.
             If reduction is 'none', return the accuracy for each sample.
@@ -161,11 +164,11 @@ class GuidewireHeatMapLoss:
         target_y = target_argmax // width
         target_x = target_argmax % width
         
-        # Vectorized window check: equivalent to the previous per-sample
-        # (tgt - w/2) <= out <= (tgt + w/2) bound check in both axes.
-        dy = (output_y - target_y).abs().to(torch.float32)
-        dx = (output_x - target_x).abs().to(torch.float32)
-        inside = (dy <= window_height / 2.0) & (dx <= window_width / 2.0)
+        # Circular window check: dx^2 + dy^2 <= (window_height/2 + window_width/2)^2
+        dy = (output_y - target_y).to(torch.float32)
+        dx = (output_x - target_x).to(torch.float32)
+        radius = window_height / 2.0 + window_width / 2.0
+        inside = (dx * dx + dy * dy) <= (radius * radius)
         accuracies = inside.to(torch.float32)
         
         # Apply reduction

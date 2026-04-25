@@ -27,22 +27,21 @@ python3 -m engine.main --train --config ver0_default.yaml
 
 ### Dataset structure
     ├── datasets
-        ├── images
-            ├── guidewire
-                ├── 01_04
-                    ├── Image
-                        ├── 1234.jpg
-                        ├── 2222.jpg (not all images have corresponding labels.)
-                        ├── 3333.jpg
-                    ├── Labels
-                        ├── 1234.jpg
-                        ├── 3333.jpg
-                ├── 05_09
-                    ├── Image
-                        ├── ...
-                    ├── Labels
-                        ├── ...
-                ├── ...
+        ├── guidewire
+            ├── 01_04
+                ├── Images
+                    ├── 1234.jpg
+                    ├── 2222.jpg (not all images have corresponding labels.)
+                    ├── 3333.jpg
+                ├── Labels
+                    ├── 1234.jpg
+                    ├── 3333.jpg
+            ├── 05_09
+                ├── Image
+                    ├── ...
+                ├── Labels
+                    ├── ...
+            ├── ...
 
 #### Reference
 * https://github.com/jahongir7174/YOLOv11-pt

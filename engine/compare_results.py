@@ -17,7 +17,7 @@ plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
 
 
-def moving_average(data: np.ndarray, window: int = 1000) -> np.ndarray:
+def moving_average(data: np.ndarray, window: int = 500) -> np.ndarray:
     """Apply moving average to smooth the data."""
     if len(data) < window:
         return data
@@ -145,6 +145,13 @@ def plot_metric_comparison(results_data: Dict[str, Tuple[pd.DataFrame, pd.DataFr
             plt.yscale('log')
             plt.ylabel(f'{metric.replace("_", " ").title()} (log scale)')
         
+        # Strict 0.0–1.0 y-axis with gridlines every 0.1 for window-accuracy metrics
+        if 'win_acc' in metric:
+            ax = plt.gca()
+            ax.set_ylim(0.0, 1.0)
+            ax.set_yticks(np.arange(0.0, 1.0 + 1e-9, 0.1))
+            ax.yaxis.grid(True, which='major', alpha=0.5)
+        
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
@@ -206,18 +213,26 @@ def main():
     # Create output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Find all experiment folders
+    # Find all experiment folders (must contain step.csv and val_loss.csv)
+    def _has_required_csvs(path: Path) -> bool:
+        return (path / "step.csv").is_file() and (path / "val_loss.csv").is_file()
+
     experiment_folders = []
     if args.target:
         for name in args.target:
             path = results_dir / name
-            if path.is_dir():
-                experiment_folders.append(path)
-            else:
+            if not path.is_dir():
                 print(f"Warning: target folder not found: {path}")
+                continue
+            if not _has_required_csvs(path):
+                print(f"Warning: target folder missing step.csv or val_loss.csv: {path}")
+                continue
+            experiment_folders.append(path)
     else:
         for item in results_dir.iterdir():
-            if item.is_dir() and item.name not in args.exclude_folders:
+            if (item.is_dir()
+                    and item.name not in args.exclude_folders
+                    and _has_required_csvs(item)):
                 experiment_folders.append(item)
     
     if not experiment_folders:

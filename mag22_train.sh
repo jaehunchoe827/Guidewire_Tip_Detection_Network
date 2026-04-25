@@ -1,19 +1,11 @@
 #!/bin/bash
 
-echo "Training ver3_default.yaml"
-python3 -m engine.main --train --config ver3_default.yaml 
+echo "Training ver3_default_hidden_144.yaml"
+python3 -m engine.main --train --config ver3_default_hidden_144.yaml 
 sleep 3
 
-echo "Training ver3_default_unfreeze_3.yaml"
-python3 -m engine.main --train --config ver3_default_unfreeze_3.yaml 
-sleep 3
-
-echo "Training ver3_default_more_crop.yaml"
-python3 -m engine.main --train --config ver3_default_more_crop.yaml 
-sleep 3
-
-echo "Training ver3_default_unfreeze_3_warmup_1.yaml"
-python3 -m engine.main --train --config ver3_default_unfreeze_3_warmup_1.yaml 
+echo "Training ver3_default_high_weight_decay.yaml"
+python3 -m engine.main --train --config ver3_default_high_weight_decay.yaml 
 sleep 3
 
 echo "All models trained successfully!"
