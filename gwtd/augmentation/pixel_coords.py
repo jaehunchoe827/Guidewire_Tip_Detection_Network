@@ -108,12 +108,11 @@ def augment_shear(image, coords, shear_x, shear_y):
         [1, shear_x, -min_x],
         [shear_y, 1, -min_y]
     ])
-    # apply random color to the border of the image
-    # .tolist() converts the numpy array to a list [B, G, R].
-    random_bgr_color = np.random.random(3).tolist()
-    # Apply transformation with expanded canvas
+    # Apply transformation with expanded canvas using reflect padding so the
+    # network sees content-consistent borders rather than uniform color.
     image_sheared = cv2.warpAffine(image, shear_matrix, (new_width, new_height),
-                                   flags=cv2.INTER_LINEAR, borderValue=random_bgr_color)
+                                   flags=cv2.INTER_LINEAR,
+                                   borderMode=cv2.BORDER_REFLECT_101)
     # Transform coordinates
     pixel_x = coords[0] * (width - 1)
     pixel_y = coords[1] * (height - 1)
@@ -153,13 +152,10 @@ def augment_rotation(image, coords, angle):
     rotation_matrix[0, 2] += (new_width / 2) - center_x
     rotation_matrix[1, 2] += (new_height / 2) - center_y
     
-    # apply random color to the border of the image
-    # .tolist() converts the numpy array to a list [B, G, R].
-    random_bgr_color = np.random.random(3).tolist()
-
-    # Apply rotation
+    # Apply rotation with reflect padding for content-consistent borders.
     image_rotated = cv2.warpAffine(image, rotation_matrix, (new_width, new_height),
-                                   flags=cv2.INTER_LINEAR, borderValue=random_bgr_color)
+                                   flags=cv2.INTER_LINEAR,
+                                   borderMode=cv2.BORDER_REFLECT_101)
     # Transform coordinates
     pixel_x = coords[0] * (width - 1)
     pixel_y = coords[1] * (height - 1)
@@ -195,6 +191,25 @@ def augment_random_scale_intensity(image, coords, scale_factor_range):
     """
     scale_factor = np.random.uniform(scale_factor_range[0], scale_factor_range[1])
     return augment_scale_intensity(image, coords, scale_factor)
+
+
+def augment_gamma(image, coords, gamma):
+    """
+    Apply gamma correction to the image.
+    gamma should be close to 1.0 (generally between 0.5 and 2.0).
+    Mimics the non-linear LUT of the X-ray imaging chain.
+    """
+    image_clipped = np.clip(image, 0.0, 1.0)
+    image_gamma = np.power(image_clipped, gamma).astype(np.float32)
+    return image_gamma, coords
+
+
+def augment_random_gamma(image, coords, gamma_range):
+    """
+    apply random gamma correction (between range) to the image
+    """
+    gamma = np.random.uniform(gamma_range[0], gamma_range[1])
+    return augment_gamma(image, coords, gamma)
 
 
 def augment_saturation(image, coords, saturation_factor):
@@ -299,6 +314,52 @@ def augment_random_gaussian_sharpness(image, coords, kernel_size, sigma_range):
     return augment_gaussian_sharpness(image, coords, kernel_size, sigma)
 
 
+def augment_motion_blur(image, coords, kernel_size, angle_deg):
+    """
+    Apply linear (directional) motion blur to the image.
+    kernel_size should be an odd integer >= 3.
+    angle_deg is the blur direction in degrees (0 = horizontal).
+    Simulates motion blur from cardiac/respiratory motion or catheter movement.
+    """
+    if kernel_size <= 1:
+        return image, coords
+    if kernel_size % 2 == 0:
+        kernel_size += 1
+
+    # Build a horizontal line kernel, then rotate it by angle_deg.
+    kernel = np.zeros((kernel_size, kernel_size), dtype=np.float32)
+    kernel[kernel_size // 2, :] = 1.0
+    rotation_matrix = cv2.getRotationMatrix2D(
+        (kernel_size / 2 - 0.5, kernel_size / 2 - 0.5), angle_deg, 1.0
+    )
+    kernel = cv2.warpAffine(kernel, rotation_matrix, (kernel_size, kernel_size),
+                            flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT,
+                            borderValue=0)
+    kernel_sum = kernel.sum()
+    if kernel_sum <= 0:
+        return image, coords
+    kernel /= kernel_sum
+
+    image_blurred = cv2.filter2D(image, -1, kernel)
+    image_blurred = np.clip(image_blurred, 0.0, 1.0).astype(np.float32)
+    return image_blurred, coords
+
+
+def augment_random_motion_blur(image, coords, kernel_size_range, angle_range):
+    """
+    apply random motion blur (between range) to the image.
+    kernel_size_range is a [min, max] pair of integers (inclusive); the chosen
+    size is forced to be odd. angle_range is a [min, max] pair of degrees.
+    """
+    kmin = int(kernel_size_range[0])
+    kmax = int(kernel_size_range[1])
+    kernel_size = int(np.random.randint(kmin, kmax + 1))
+    if kernel_size % 2 == 0:
+        kernel_size += 1
+    angle_deg = float(np.random.uniform(angle_range[0], angle_range[1]))
+    return augment_motion_blur(image, coords, kernel_size, angle_deg)
+
+
 def augment_elastic_deformation(image, coords, alpha, sigma = 1.0):
     """
     Apply elastic deformation to image and coordinates
@@ -327,22 +388,24 @@ def augment_elastic_deformation(image, coords, alpha, sigma = 1.0):
     x_new = np.clip(x_new, 0, width - 1)
     y_new = np.clip(y_new, 0, height - 1)
     
-    # Apply elastic deformation to image
-    image_elastic = cv2.remap(image, x_new.astype(np.float32), y_new.astype(np.float32), 
-                              cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
-    
     # Transform coordinates
     pixel_x = coords[0] * (width - 1)
     pixel_y = coords[1] * (height - 1)
-    
+
     # Apply displacement to coordinates
     new_pixel_x = pixel_x + dx[round(pixel_y), round(pixel_x)]
     new_pixel_y = pixel_y + dy[round(pixel_y), round(pixel_x)]
-    
-    # Clip coordinates after applying displacement
-    new_pixel_x = np.clip(new_pixel_x, 0, width - 1)
-    new_pixel_y = np.clip(new_pixel_y, 0, height - 1)
-    
+
+    # Skip the augmentation if the displaced tip lands outside the image;
+    # clipping would decouple the label from the deformed image content.
+    if (new_pixel_x < 0 or new_pixel_x > width - 1 or
+            new_pixel_y < 0 or new_pixel_y > height - 1):
+        return image, coords
+
+    # Apply elastic deformation to image
+    image_elastic = cv2.remap(image, x_new.astype(np.float32), y_new.astype(np.float32),
+                              cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+
     # Normalize coordinates
     coords_elastic = [new_pixel_x / (width - 1), new_pixel_y / (height - 1)]
     return image_elastic, coords_elastic
@@ -441,21 +504,27 @@ def augment_perspective(image, coords, perspective_factor):
     perspective_matrix[0, 2] -= min_x
     perspective_matrix[1, 2] -= min_y
     
-    # Apply perspective transformation with actual distorted shape
-    image_perspective = cv2.warpPerspective(image, perspective_matrix, (new_width, new_height))
-    
-    # Transform coordinates
+    # Transform coordinates first so we can bail out before warping the image
+    # if the tip would land outside the new canvas.
     pixel_x = coords[0] * (width - 1)
     pixel_y = coords[1] * (height - 1)
-    
-    # Apply perspective transformation to coordinates
     coords_homogeneous = np.array([pixel_x, pixel_y, 1])
     transformed_coords = perspective_matrix @ coords_homogeneous
-    
-    # Normalize coordinates to new canvas size
-    coords_perspective = [np.clip(transformed_coords[0] / transformed_coords[2] / (new_width - 1), 0, 1),
-                         np.clip(transformed_coords[1] / transformed_coords[2] / (new_height - 1), 0, 1)]
-    
+    new_x = transformed_coords[0] / transformed_coords[2] / (new_width - 1)
+    new_y = transformed_coords[1] / transformed_coords[2] / (new_height - 1)
+
+    # Skip the augmentation if the tip falls outside the warped canvas;
+    # silently clipping would corrupt the label.
+    if new_x < 0.0 or new_x > 1.0 or new_y < 0.0 or new_y > 1.0:
+        return image, coords
+
+    # Apply perspective transformation with actual distorted shape
+    image_perspective = cv2.warpPerspective(
+        image, perspective_matrix, (new_width, new_height),
+        borderMode=cv2.BORDER_REFLECT_101,
+    )
+
+    coords_perspective = [new_x, new_y]
     return image_perspective, coords_perspective
 
 
@@ -524,27 +593,17 @@ def augment_random_crop(image, coords, crop_size, safe_reigon=0.1):
     # Crop the image from the original image
     cropped_image = image[y1_crop:y2_crop, x1_crop:x2_crop]
     
-    # Add padding if needed
+    # Add padding if needed, using reflect padding so the borders blend with
+    # actual image content rather than a uniform random color. np.pad's
+    # 'reflect' mode handles pad amounts larger than the source dimension by
+    # repeated reflection, which can happen when the crop window juts well
+    # outside the image after upstream geometric augs.
     if pad_left > 0 or pad_top > 0 or pad_right > 0 or pad_bottom > 0:
-        # Create the final padded image
-        final_height = crop_height
-        final_width = crop_width
-        
-        if len(image.shape) == 2:  # Grayscale image [H, W]
-            padded_image = np.full((final_height, final_width), np.random.rand())
-        elif len(image.shape) == 3 and image.shape[2] == 1:  # Grayscale image [H, W, 1]
-            padded_image = np.full((final_height, final_width, 1), np.random.rand())
-        else:  # Color image [H, W, 3]
-            padded_image = np.full((final_height, final_width, 3), np.random.rand(3))
-        
-        # Place the cropped image in the correct position
-        start_y = pad_top
-        start_x = pad_left
-        end_y = start_y + cropped_image.shape[0]
-        end_x = start_x + cropped_image.shape[1]
-        
-        padded_image[start_y:end_y, start_x:end_x] = cropped_image
-        cropped_image = padded_image
+        if cropped_image.ndim == 2:
+            pad_widths = ((pad_top, pad_bottom), (pad_left, pad_right))
+        else:
+            pad_widths = ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0))
+        cropped_image = np.pad(cropped_image, pad_widths, mode='reflect')
     
     # Update coordinates relative to the cropped image
     # Account for the original crop position and any padding

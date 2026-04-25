@@ -162,6 +162,16 @@ class GuidewireDataSet(data.Dataset):
                             image_augmented, label_augmented,
                             **aug_params['args']
                         )
+                    elif aug_name == 'random_gamma':
+                        image_augmented, label_augmented = aug_functions.augment_random_gamma(
+                            image_augmented, label_augmented,
+                            **aug_params['args']
+                        )
+                    elif aug_name == 'random_motion_blur':
+                        image_augmented, label_augmented = aug_functions.augment_random_motion_blur(
+                            image_augmented, label_augmented,
+                            **aug_params['args']
+                        )
                     elif aug_name == 'random_elastic_deformation':
                         image_augmented, label_augmented = aug_functions.augment_random_elastic_deformation(
                             image_augmented, label_augmented,

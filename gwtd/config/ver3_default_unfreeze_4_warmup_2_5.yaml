@@ -48,15 +48,19 @@ dataset:
       args:
         brightness_factor_range: [-0.2, 0.2]
     random_horizontal_flip:
-      probability: 0.3
+      probability: 0.5
       args:
     random_vertical_flip:
-      probability: 0.3
+      probability: 0.5
       args:
     random_scale_intensity:
       probability: 0.3
       args:
         scale_factor_range: [0.8, 1.2]
+    random_gamma:
+      probability: 0.3
+      args:
+        gamma_range: [0.7, 1.4]
     random_saturation:
       probability: 0.3
       args:
@@ -70,6 +74,11 @@ dataset:
       args:
         kernel_size: 5
         sigma_range: [-1.5, 1.5]
+    random_motion_blur:
+      probability: 0.3
+      args:
+        kernel_size_range: [3, 11]
+        angle_range: [0.0, 180.0]
     random_elastic_deformation:
       probability: 0.3
       args:
@@ -92,7 +101,7 @@ dataset:
     random_rotation:
       probability: 0.5
       args:
-        angle_range: [-3.14159, 3.14159] # radians
+        angle_range: [-0.7854, 0.7854] # radians (+/- pi/4)
     random_crop:
       probability: 0.3
       args:
