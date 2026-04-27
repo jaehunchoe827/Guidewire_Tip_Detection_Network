@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 import cv2
 import yaml
@@ -100,6 +101,10 @@ class GuidewireTipDetector:
             'gray_noised': per-image gray + gaussian-noise arrays at the
                 NETWORK INPUT resolution, float32 in [0, 1], shape (B, H, W).
                 Useful for visualizing what was fed to the network.
+            'noise_seed': int64 seed used to draw the X-ray Gaussian noise
+                for this call. Re-seeding a torch.Generator with this value
+                on the same device + dtype reproduces ``gray_noised`` (and
+                therefore the heatmaps) bit-for-bit.
         """
         use_cuda = torch.cuda.is_available()
         device = torch.device('cuda' if use_cuda else 'cpu')
@@ -158,10 +163,20 @@ class GuidewireTipDetector:
                 f"(expected 'opencv' or 'mean')"
             )
 
-        # torch.randn is the GPU analogue of np.random.normal. Distribution
-        # matches (Gaussian with sigma = self.sigma_xray_noise), but
-        # individual samples differ because the RNG source is different.
-        noise = torch.randn_like(gray) * self.sigma_xray_noise
+        # Draw a fresh int64 seed per call and feed it into a dedicated
+        # torch.Generator so the noise (and therefore the heatmaps) are
+        # reproducible from the seed alone. We use a 63-bit unsigned int so it
+        # fits in a signed int64 without wrapping. The generator must live on
+        # the same device as ``gray`` for CUDA randn to honor manual_seed.
+        noise_seed = random.getrandbits(63)
+        noise_generator = torch.Generator(device=device)
+        noise_generator.manual_seed(noise_seed)
+        noise = torch.randn(
+            gray.shape,
+            dtype=gray.dtype,
+            device=device,
+            generator=noise_generator,
+        ) * self.sigma_xray_noise
         gray_noised = (gray + noise).clamp_(0.0, 1.0)
 
         gray_noised_vis = gray_noised.squeeze(1)  # (B, H, W) on device
@@ -195,5 +210,6 @@ class GuidewireTipDetector:
             'heatmaps': preds_np,
             'tip_positions': peak_positions,
             'gray_noised': gray_noised_out,
+            'noise_seed': noise_seed,
         }
 
