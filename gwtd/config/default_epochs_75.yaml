@@ -3,10 +3,10 @@ from_logits: true
 
 training:
   # note that the epoch starts from 1
-  epochs: 45
+  epochs: 75
   batch_size: 8
   accumulate: 3 # accumulate over 4 batches
-  unfreeze_backbone_epochs: 3 # unfreeze backbone at the start of this epoch
+  unfreeze_backbone_epochs: 4 # unfreeze backbone at the start of this epoch
   loss_main: ["bce", "mse"]
   loss_weights:
     bce: 0.9
