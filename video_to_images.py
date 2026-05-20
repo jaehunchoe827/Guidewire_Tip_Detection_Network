@@ -26,7 +26,7 @@ except ImportError:  # tqdm is optional; fall back to a no-op wrapper.
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_VIDEOS_DIR = SCRIPT_DIR / "videos"
-DEFAULT_DATASETS_DIR = SCRIPT_DIR / "datasets"
+DEFAULT_DATASETS_DIR = SCRIPT_DIR / "datasets" / "guidewire"
 VIDEO_EXTENSIONS = {".avi", ".mp4", ".mov", ".mkv", ".m4v", ".mpg", ".mpeg", ".wmv", ".flv", ".webm"}
 
 DEFAULT_JPEG_QUALITY = 90
