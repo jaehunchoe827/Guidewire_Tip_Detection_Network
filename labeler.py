@@ -15,15 +15,58 @@ while a pixel is selected.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Optional
 
-import cv2
 import numpy as np
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QImage, QKeySequence, QPainter, QPen, QPixmap
-from PyQt5.QtWidgets import (
+
+# opencv-python ships its own Qt5 platform plugins under cv2/qt/plugins and,
+# on import, unconditionally points QT_QPA_PLATFORM_PLUGIN_PATH at them
+# (see cv2/config-3.py). Those plugins are built against a different Qt than
+# the system PyQt5 (Qt 5.15.3 here), which is why PyQt5 then fails with
+# "Could not load the Qt platform plugin 'xcb'" / "QObject::moveToThread".
+# Import cv2 first, then redirect the Qt plugin path back to the system /
+# PyQt5 plugins before any PyQt5 module is loaded.
+import cv2  # noqa: E402
+
+
+def _restore_system_qt_plugin_path() -> None:
+    candidates: list[str] = []
+    try:
+        import PyQt5 as _pyqt5  # type: ignore
+
+        pyqt_dir = os.path.dirname(_pyqt5.__file__)
+        candidates += [
+            os.path.join(pyqt_dir, "Qt5", "plugins"),
+            os.path.join(pyqt_dir, "Qt", "plugins"),
+        ]
+    except Exception:
+        pass
+    candidates += [
+        "/usr/lib/x86_64-linux-gnu/qt5/plugins",
+        "/usr/lib/qt5/plugins",
+    ]
+    for path in candidates:
+        if os.path.isdir(os.path.join(path, "platforms")):
+            os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = path
+            os.environ.pop("QT_QPA_FONTDIR", None)
+            return
+
+
+_restore_system_qt_plugin_path()
+
+from PyQt5.QtCore import Qt, pyqtSignal  # noqa: E402
+from PyQt5.QtGui import (  # noqa: E402
+    QColor,
+    QImage,
+    QKeySequence,
+    QPainter,
+    QPen,
+    QPixmap,
+)
+from PyQt5.QtWidgets import (  # noqa: E402
     QApplication,
     QComboBox,
     QHBoxLayout,
