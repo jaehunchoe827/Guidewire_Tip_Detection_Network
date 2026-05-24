@@ -5,6 +5,7 @@ import yaml
 import torch
 import random
 import numpy as np
+from tqdm import tqdm
 from torch.utils import data
 
 from gwtd.data_loader.guidewire_data_loader import GuidewireDataSet
@@ -21,8 +22,12 @@ from gwtd.utils import util
 
 
 # Edit these two constants per run.
-CONFIG_NAME = "default_epochs_75"
-SELECTED_DATASETS = ["103", "104"]
+CONFIG_NAME = "default"
+SELECTED_DATASETS = [
+    "103", "104", "106", "107", "108", "109", "110", "111", "112", "113",
+    "114", "115", "117", "119", "120", "121", "122", "123", "124", "125",
+    "126", "127", "128"
+]
 
 
 def collect_data_sample_names(dir_dataset: str, selected_datasets: list):
@@ -101,7 +106,7 @@ def run_test_on_selected_datasets(config, selected_datasets):
         test_losses_sum = {}
         num_test_batches = max(1, len(test_loader))
         with torch.no_grad():
-            for x_test, y_test in test_loader:
+            for x_test, y_test in tqdm(test_loader, total=num_test_batches, desc='Testing'):
                 x_test = x_test.cuda(non_blocking=True)
                 y_test = y_test.cuda(non_blocking=True)
                 with torch.amp.autocast(device_type='cuda'):
