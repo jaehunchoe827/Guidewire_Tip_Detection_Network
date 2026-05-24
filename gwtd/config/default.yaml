@@ -38,7 +38,7 @@ dataset:
   image_initial_resize_ratio: 0.8
   split_ratio: [0.8, 0.1, 0.1] # train, val, test
   heatmap_sigma: 4.0
-  sigma_xray_noise: 0.025
+  sigma_xray_noise: 0.0125
   augmentation:
     random_brightness:
       probability: 0.3
@@ -70,16 +70,16 @@ dataset:
       probability: 0.3
       args:
         kernel_size: 5
-        sigma_range: [-1.5, 1.5]
+        sigma_range: [0.1, 1.5]
     random_motion_blur:
-      probability: 0.3
+      probability: 0.1
       args:
         kernel_size_range: [3, 11]
         angle_range: [0.0, 180.0]
     random_elastic_deformation:
       probability: 0.3
       args:
-        alpha_range: [0.0, 0.004]
+        alpha_range: [0.0, 0.002]
         sigma: 1.0
     random_perspective:
       probability: 0.3
@@ -116,4 +116,4 @@ dataset:
     random_gaussian_noise:
       probability: 1.0
       args:
-        sigma_range: [0.0, 0.07]
+        sigma_range: [0.0, 0.025]
