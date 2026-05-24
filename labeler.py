@@ -83,8 +83,8 @@ from PyQt5.QtWidgets import (  # noqa: E402
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATASETS_DIR = SCRIPT_DIR / "datasets" / "guidewire"
 
-MAG_SCALE = 5
-MAG_RADIUS = 100  # source crop half-size -> 200x200 region around cursor
+MAG_SCALE = 10
+MAG_RADIUS = 50  # source crop half-size -> 200x200 region around cursor
 MAG_SIZE = MAG_RADIUS * 2 * MAG_SCALE  # 1000
 
 CIRCLE_RADIUS = 5
