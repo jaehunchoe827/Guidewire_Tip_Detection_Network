@@ -1,6 +1,7 @@
 import os
 import sys
 import csv
+import json
 import copy
 import tqdm
 import yaml
@@ -329,57 +330,49 @@ def test(config):
         yaml.dump(config, f)
 
     criterion = GuidewireHeatMapLoss(from_logits=config['from_logits'])
-    
-    # Train
-    with open(os.path.join(results_dir, 'test_loss.csv'), 'w') as test_log:        
-        # Define CSV headers for test losses (will be set after first test)
-        test_writer = csv.writer(test_log)
-        test_headers_written = False
 
-        # Test at end of epoch
-        model.eval()
-        test_losses_sum = {}
-        num_test_batches = max(1, len(test_loader))
-        with torch.no_grad():
-            for x_test, y_test in test_loader:
-                x_test = x_test.cuda(non_blocking=True)
-                y_test = y_test.cuda(non_blocking=True)
-                # for test, we disable AMP to avoid precision issues
-                with torch.amp.autocast(device_type='cuda'):
-                    pred_test = model(x_test)
-                test_losses = criterion(pred_test, y_test)
-                
-                # Accumulate test losses
-                for loss_name, loss_value in test_losses.items():
-                    if loss_name not in test_losses_sum:
-                        test_losses_sum[loss_name] = 0.0
-                    test_losses_sum[loss_name] += float(loss_value.item())
-        
-        # Calculate average test losses
-        test_losses_avg = {loss_name: loss_sum / num_test_batches 
-                            for loss_name, loss_sum in test_losses_sum.items()}
-        
-        # Calculate weighted total test loss
-        test_loss_total = 0.0
-        for loss_name in config['training']['loss_main']:
-            if loss_name in test_losses_avg and loss_name in config['training']['loss_weights']:
-                test_loss_total += config['training']['loss_weights'][loss_name] * test_losses_avg[loss_name]
-    
-        # Log test losses to CSV
-        if not test_headers_written:
-            # Write headers dynamically based on available losses
-            test_csv_headers = ['epoch', 'test_loss_total'] + list(test_losses_avg.keys())
-            test_writer.writerow(test_csv_headers)
-            test_headers_written = True
+    model.eval()
+    test_losses_sum = {}
+    num_test_batches = max(1, len(test_loader))
+    with torch.no_grad():
+        p_bar = tqdm.tqdm(test_loader, total=num_test_batches,
+                          desc='Testing', leave=True, ncols=50)
+        for x_test, y_test in p_bar:
+            x_test = x_test.cuda(non_blocking=True)
+            y_test = y_test.cuda(non_blocking=True)
+            with torch.amp.autocast(device_type='cuda'):
+                pred_test = model(x_test)
+            test_losses = criterion(pred_test, y_test)
 
-        test_csv_row = [test_loss_total]
-        for loss_name, loss_value in test_losses_avg.items():
-            test_csv_row.append(loss_value)
-        test_writer.writerow(test_csv_row)
+            for loss_name, loss_value in test_losses.items():
+                if loss_name not in test_losses_sum:
+                    test_losses_sum[loss_name] = 0.0
+                test_losses_sum[loss_name] += float(loss_value.item())
 
-        print(f"Test loss: {test_loss_total:.6f}")
-        for loss_name, loss_value in test_losses_avg.items():
-            print(f"{loss_name}: {loss_value:.6f}")
+    test_losses_avg = {loss_name: loss_sum / num_test_batches
+                       for loss_name, loss_sum in test_losses_sum.items()}
+
+    test_loss_total = 0.0
+    for loss_name in config['training']['loss_main']:
+        if loss_name in test_losses_avg and loss_name in config['training']['loss_weights']:
+            test_loss_total += config['training']['loss_weights'][loss_name] * test_losses_avg[loss_name]
+
+    test_results = {
+        'number_of_test_samples': len(test_dataset),
+        'test_loss': test_loss_total,
+    }
+    test_results.update(test_losses_avg)
+
+    test_dir = os.path.join(results_dir, 'test')
+    os.makedirs(test_dir, exist_ok=True)
+    test_results_path = os.path.join(test_dir, 'test_results.json')
+    with open(test_results_path, 'w') as f:
+        json.dump(test_results, f, indent=2)
+    print(f"Saved test results to {test_results_path}")
+
+    print(f"Test loss: {test_loss_total:.6f}")
+    for loss_name, loss_value in test_losses_avg.items():
+        print(f"{loss_name}: {loss_value:.6f}")
 
     return
 
