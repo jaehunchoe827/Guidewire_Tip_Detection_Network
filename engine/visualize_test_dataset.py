@@ -65,7 +65,7 @@ def predict_heatmap(model, image_std: np.ndarray, from_logits: bool) -> np.ndarr
 
 def draw_circle(ax, center_xy: tuple, color: str, radius: float = 12.0) -> None:
     ax.add_patch(Circle(center_xy, radius=radius, fill=False,
-                        edgecolor=color, linewidth=2.5))
+                        edgecolor=color, linewidth=1.5))
 
 
 def select_samples(test_samples: list, num_optical: int, num_xray: int, seed: int) -> list:
