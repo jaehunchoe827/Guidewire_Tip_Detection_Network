@@ -10,7 +10,7 @@ from gwtd.utils.standardization import standardize_image, destandardize_image
 
 
 class GuidewireDataSet(data.Dataset):
-    def __init__(self, data_sample_names: list, apply_augmentation: bool = False, config: dict = None, apply_standardization: bool = True):
+    def __init__(self, data_sample_names: list, apply_augmentation: bool = False, config: dict = None, apply_standardization: bool = True, skip_xray_default_noise: bool = False):
         self.data_sample_names = data_sample_names
         self.apply_augmentation = apply_augmentation
         self.config = config
@@ -20,11 +20,29 @@ class GuidewireDataSet(data.Dataset):
         self.heatmap_sigma = self.config['dataset']['heatmap_sigma']
         self.sigma_xray_noise = self.config['dataset']['sigma_xray_noise']
         self.apply_standardization = apply_standardization
+        # When True, the synthetic x-ray Gaussian noise (applied in the
+        # non-augmentation path) is skipped for images that are already x-ray.
+        # Used for testing so real x-ray images are not doubly noised.
+        self.skip_xray_default_noise = skip_xray_default_noise
         self.image_mean = np.array([0.485, 0.456, 0.406])
         self.image_std = np.array([0.229, 0.224, 0.225])
 
     def __len__(self):
         return len(self.data_sample_names)
+
+    @staticmethod
+    def is_xray_image(image_path: str) -> bool:
+        """Optical if the video subfolder's primary number < 100, x-ray if >= 100.
+
+        The image path is expected to be .../<subfolder>/Images/<name>.jpg, so
+        the subfolder is two directories up from the image file.
+        """
+        subfolder_name = os.path.basename(os.path.dirname(os.path.dirname(image_path)))
+        try:
+            primary_number = int(subfolder_name.split('_')[0])
+        except ValueError:
+            return False
+        return primary_number >= 100
     
     def __getitem__(self, index, get_heatmap: bool = True, apply_default_noise = True):
         image_path, label_path = self.data_sample_names[index]
@@ -53,8 +71,13 @@ class GuidewireDataSet(data.Dataset):
         # Some numpy operations can upcast to float64; cv2.cvtColor doesn't support CV_64F.
         image = np.ascontiguousarray(image, dtype=np.float32)
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        # if apply_augmentation = False, apply random gaussian noise to the image
-        if not self.apply_augmentation and apply_default_noise:
+        # if apply_augmentation = False, apply random gaussian noise to the image.
+        # This noise simulates x-ray sensor noise, so when skip_xray_default_noise
+        # is set (testing) we do not add it to images that are already x-ray.
+        apply_noise = not self.apply_augmentation and apply_default_noise
+        if apply_noise and self.skip_xray_default_noise and self.is_xray_image(image_path):
+            apply_noise = False
+        if apply_noise:
             image, label = aug_functions.augment_gaussian_noise(image, label,
                                                                 sigma=self.sigma_xray_noise)
         if get_heatmap:

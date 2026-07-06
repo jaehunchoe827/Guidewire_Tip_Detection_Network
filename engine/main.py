@@ -307,7 +307,10 @@ def evaluate_samples(config, model, criterion, samples, desc='Testing'):
     Returns a dict with the number of samples, total test loss and every
     averaged loss term.
     """
-    test_dataset = GuidewireDataSet(samples, apply_augmentation=False, config=config)
+    # skip_xray_default_noise=True: real x-ray images are not given the synthetic
+    # x-ray Gaussian noise during testing (optical images still get it).
+    test_dataset = GuidewireDataSet(samples, apply_augmentation=False, config=config,
+                                    skip_xray_default_noise=True)
     print(f"number of test samples: {len(test_dataset)}")
 
     # deterministic seeding for DataLoader workers and shuffling
