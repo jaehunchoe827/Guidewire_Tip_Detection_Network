@@ -285,8 +285,8 @@ def train(config):
             model.train()
     return
 
-def test(config):
-    # create the model
+def build_test_model(config):
+    """Create the model and load the trained weights for evaluation."""
     name_backbone = config['backbone']
     backbone_weights_path = os.path.join(project_root, 'weights', f'{name_backbone}.pt')
     model = nn.YOLOwithCustomHead(name_backbone,
@@ -298,13 +298,17 @@ def test(config):
     # load weights
     weights_path = os.path.join(project_root, 'results', config['config_name'], 'best.pt')
     util.load_weight(model, weights_path)
-    # prepare dataset and loader
-    dataset_path = os.path.join(project_root, 'datasets', 'guidewire')
-    data_preprocessor = GuidewireDataPreprocessor(dir_dataset=dataset_path,
-                                                  split_ratio=config['dataset']['split_ratio'])
-    test_dataset = GuidewireDataSet(data_preprocessor.get_data_sample_names('test'),
-                                     apply_augmentation=False, config=config)
-    print (f"number of test samples: {len(test_dataset)}")
+    return model
+
+
+def evaluate_samples(config, model, criterion, samples, desc='Testing'):
+    """Run evaluation on the given (image_path, label_path) samples.
+
+    Returns a dict with the number of samples, total test loss and every
+    averaged loss term.
+    """
+    test_dataset = GuidewireDataSet(samples, apply_augmentation=False, config=config)
+    print(f"number of test samples: {len(test_dataset)}")
 
     # deterministic seeding for DataLoader workers and shuffling
     def seed_worker(worker_id):
@@ -321,22 +325,12 @@ def test(config):
                                  collate_fn=GuidewireDataSet.collate_fn,
                                  worker_init_fn=seed_worker, generator=g)
 
-
-    results_dir = os.path.join(project_root, 'results', config['config_name'])
-    os.makedirs(results_dir, exist_ok=True)
-
-    # save the config
-    with open(os.path.join(results_dir, 'config_test.yaml'), 'w') as f:
-        yaml.dump(config, f)
-
-    criterion = GuidewireHeatMapLoss(from_logits=config['from_logits'])
-
     model.eval()
     test_losses_sum = {}
     num_test_batches = max(1, len(test_loader))
     with torch.no_grad():
         p_bar = tqdm.tqdm(test_loader, total=num_test_batches,
-                          desc='Testing', leave=True, ncols=50)
+                          desc=desc, leave=True, ncols=50)
         for x_test, y_test in p_bar:
             x_test = x_test.cuda(non_blocking=True)
             y_test = y_test.cuda(non_blocking=True)
@@ -362,6 +356,27 @@ def test(config):
         'test_loss': test_loss_total,
     }
     test_results.update(test_losses_avg)
+    return test_results
+
+
+def test(config):
+    model = build_test_model(config)
+    # prepare dataset and loader
+    dataset_path = os.path.join(project_root, 'datasets', 'guidewire')
+    data_preprocessor = GuidewireDataPreprocessor(dir_dataset=dataset_path,
+                                                  split_ratio=config['dataset']['split_ratio'])
+
+    results_dir = os.path.join(project_root, 'results', config['config_name'])
+    os.makedirs(results_dir, exist_ok=True)
+
+    # save the config
+    with open(os.path.join(results_dir, 'config_test.yaml'), 'w') as f:
+        yaml.dump(config, f)
+
+    criterion = GuidewireHeatMapLoss(from_logits=config['from_logits'])
+
+    test_results = evaluate_samples(config, model, criterion,
+                                    data_preprocessor.get_data_sample_names('test'))
 
     test_dir = os.path.join(results_dir, 'test')
     os.makedirs(test_dir, exist_ok=True)
@@ -370,8 +385,11 @@ def test(config):
         json.dump(test_results, f, indent=2)
     print(f"Saved test results to {test_results_path}")
 
+    test_loss_total = test_results['test_loss']
     print(f"Test loss: {test_loss_total:.6f}")
-    for loss_name, loss_value in test_losses_avg.items():
+    for loss_name, loss_value in test_results.items():
+        if loss_name in ('number_of_test_samples', 'test_loss'):
+            continue
         print(f"{loss_name}: {loss_value:.6f}")
 
     return

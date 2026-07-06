@@ -1,7 +1,8 @@
 __pycache__/
 datasets/
 weights/
-results/
+*.pt
+*.csv
 results_bilinear_upsample/
 results_check_points/
 temp/

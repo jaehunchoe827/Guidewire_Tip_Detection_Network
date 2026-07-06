@@ -62,6 +62,78 @@ def print_modality_counts(title: str, optical: int, xray: int) -> None:
     print(f"  total:   {summary['total']}")
 
 
+def filter_samples_by_modality(samples: list, dir_dataset: str, modality: str) -> list:
+    """Return the subset of samples that belong to the requested modality.
+
+    modality: 'optical' or 'x-ray'.
+    """
+    filtered = []
+    for image_path, label_path in samples:
+        is_xray = is_xray_subfolder(get_subfolder_from_sample(image_path, dir_dataset))
+        if (modality == 'x-ray' and is_xray) or (modality == 'optical' and not is_xray):
+            filtered.append((image_path, label_path))
+    return filtered
+
+
+def test_by_image_types(config: dict, config_name: str) -> dict:
+    """Run the test (from engine.main) on the test split for three image-type
+    subsets: all images, optical only, and x-ray only. Results are written to
+    results/<config_name>/test/test_results_by_image_types.json.
+    """
+    # Imported lazily so that plain dataset analysis does not require torch/CUDA.
+    from engine.main import build_test_model, evaluate_samples
+    from gwtd.loss.loss import GuidewireHeatMapLoss
+
+    config = dict(config)
+    config['config_name'] = config_name
+
+    dataset_path = os.path.join(project_root, 'datasets', 'guidewire')
+    split_ratio = config['dataset']['split_ratio']
+    preprocessor = GuidewireDataPreprocessor(
+        dir_dataset=dataset_path,
+        split_ratio=split_ratio,
+    )
+    test_samples = preprocessor.get_data_sample_names('test')
+    optical_samples = filter_samples_by_modality(test_samples, dataset_path, 'optical')
+    xray_samples = filter_samples_by_modality(test_samples, dataset_path, 'x-ray')
+
+    subsets = {
+        'all': test_samples,
+        'optical': optical_samples,
+        'x-ray': xray_samples,
+    }
+
+    print('\n' + '=' * 60)
+    print('Testing on test split by image type')
+    print('=' * 60)
+
+    model = build_test_model(config)
+    criterion = GuidewireHeatMapLoss(from_logits=config['from_logits'])
+
+    results_by_image_types = {'config_name': config_name}
+    for subset_name, subset_samples in subsets.items():
+        print(f"\n--- {subset_name} ({len(subset_samples)} samples) ---")
+        if len(subset_samples) == 0:
+            print(f"No {subset_name} samples in test split; skipping.")
+            results_by_image_types[subset_name] = {
+                'number_of_test_samples': 0,
+            }
+            continue
+        subset_results = evaluate_samples(config, model, criterion, subset_samples,
+                                          desc=f"Testing ({subset_name})")
+        results_by_image_types[subset_name] = subset_results
+        print(f"{subset_name} test loss: {subset_results['test_loss']:.6f}")
+
+    results_dir = os.path.join(project_root, 'results', config_name, 'test')
+    os.makedirs(results_dir, exist_ok=True)
+    results_path = os.path.join(results_dir, 'test_results_by_image_types.json')
+    with open(results_path, 'w') as f:
+        json.dump(results_by_image_types, f, indent=2)
+    print(f"\nSaved test results by image types to {results_path}")
+
+    return results_by_image_types
+
+
 def analyze_dataset(config: dict, config_name: str) -> dict:
     dataset_path = os.path.join(project_root, 'datasets', 'guidewire')
     split_ratio = config['dataset']['split_ratio']
@@ -158,6 +230,7 @@ def main():
     config_name = args.config.split('.')[0]
     print(f"Config: {args.config}")
     analyze_dataset(config, config_name)
+    test_by_image_types(config, config_name)
 
 
 if __name__ == '__main__':

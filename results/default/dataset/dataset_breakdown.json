@@ -1,0 +1,251 @@
+{
+  "config_name": "default",
+  "split_ratio": [
+    0.8,
+    0.1,
+    0.1
+  ],
+  "labels_per_subfolder": {
+    "01_04": {
+      "label_count": 379,
+      "modality": "optical"
+    },
+    "05_09": {
+      "label_count": 2354,
+      "modality": "optical"
+    },
+    "103": {
+      "label_count": 263,
+      "modality": "x-ray"
+    },
+    "104": {
+      "label_count": 371,
+      "modality": "x-ray"
+    },
+    "106": {
+      "label_count": 588,
+      "modality": "x-ray"
+    },
+    "107": {
+      "label_count": 465,
+      "modality": "x-ray"
+    },
+    "108": {
+      "label_count": 707,
+      "modality": "x-ray"
+    },
+    "109": {
+      "label_count": 663,
+      "modality": "x-ray"
+    },
+    "10_14": {
+      "label_count": 577,
+      "modality": "optical"
+    },
+    "110": {
+      "label_count": 370,
+      "modality": "x-ray"
+    },
+    "111": {
+      "label_count": 267,
+      "modality": "x-ray"
+    },
+    "112": {
+      "label_count": 287,
+      "modality": "x-ray"
+    },
+    "113": {
+      "label_count": 181,
+      "modality": "x-ray"
+    },
+    "114": {
+      "label_count": 430,
+      "modality": "x-ray"
+    },
+    "115": {
+      "label_count": 414,
+      "modality": "x-ray"
+    },
+    "117": {
+      "label_count": 560,
+      "modality": "x-ray"
+    },
+    "119": {
+      "label_count": 460,
+      "modality": "x-ray"
+    },
+    "120": {
+      "label_count": 498,
+      "modality": "x-ray"
+    },
+    "121": {
+      "label_count": 70,
+      "modality": "x-ray"
+    },
+    "122": {
+      "label_count": 453,
+      "modality": "x-ray"
+    },
+    "123": {
+      "label_count": 237,
+      "modality": "x-ray"
+    },
+    "124": {
+      "label_count": 207,
+      "modality": "x-ray"
+    },
+    "125": {
+      "label_count": 245,
+      "modality": "x-ray"
+    },
+    "126": {
+      "label_count": 563,
+      "modality": "x-ray"
+    },
+    "127": {
+      "label_count": 426,
+      "modality": "x-ray"
+    },
+    "128": {
+      "label_count": 119,
+      "modality": "x-ray"
+    },
+    "15_19": {
+      "label_count": 1178,
+      "modality": "optical"
+    },
+    "20_24": {
+      "label_count": 1584,
+      "modality": "optical"
+    },
+    "25_29": {
+      "label_count": 917,
+      "modality": "optical"
+    },
+    "30_34": {
+      "label_count": 1573,
+      "modality": "optical"
+    },
+    "35_39": {
+      "label_count": 1158,
+      "modality": "optical"
+    },
+    "40_44": {
+      "label_count": 211,
+      "modality": "optical"
+    },
+    "45_47": {
+      "label_count": 325,
+      "modality": "optical"
+    },
+    "48_50": {
+      "label_count": 700,
+      "modality": "optical"
+    },
+    "51_55": {
+      "label_count": 3719,
+      "modality": "optical"
+    },
+    "56_60": {
+      "label_count": 1879,
+      "modality": "optical"
+    },
+    "61_62": {
+      "label_count": 1688,
+      "modality": "optical"
+    },
+    "63_64": {
+      "label_count": 885,
+      "modality": "optical"
+    },
+    "65_66": {
+      "label_count": 782,
+      "modality": "optical"
+    },
+    "70": {
+      "label_count": 680,
+      "modality": "optical"
+    },
+    "71": {
+      "label_count": 875,
+      "modality": "optical"
+    },
+    "72": {
+      "label_count": 971,
+      "modality": "optical"
+    },
+    "73": {
+      "label_count": 1083,
+      "modality": "optical"
+    },
+    "74": {
+      "label_count": 893,
+      "modality": "optical"
+    },
+    "75": {
+      "label_count": 1159,
+      "modality": "optical"
+    },
+    "76": {
+      "label_count": 675,
+      "modality": "optical"
+    },
+    "77": {
+      "label_count": 660,
+      "modality": "optical"
+    },
+    "78": {
+      "label_count": 1022,
+      "modality": "optical"
+    },
+    "79": {
+      "label_count": 1374,
+      "modality": "optical"
+    },
+    "80": {
+      "label_count": 1073,
+      "modality": "optical"
+    },
+    "81": {
+      "label_count": 1191,
+      "modality": "optical"
+    },
+    "82": {
+      "label_count": 608,
+      "modality": "optical"
+    },
+    "83": {
+      "label_count": 695,
+      "modality": "optical"
+    }
+  },
+  "total_labels": 41712,
+  "image_label_pairs": {
+    "total": 41712,
+    "train": 33370,
+    "val": 4171,
+    "test": 4171
+  },
+  "modality_breakdown": {
+    "total": {
+      "optical": 32868,
+      "x-ray": 8844,
+      "total": 41712
+    },
+    "train": {
+      "optical": 26269,
+      "x-ray": 7101,
+      "total": 33370
+    },
+    "val": {
+      "optical": 3295,
+      "x-ray": 876,
+      "total": 4171
+    },
+    "test": {
+      "optical": 3304,
+      "x-ray": 867,
+      "total": 4171
+    }
+  }
+}
