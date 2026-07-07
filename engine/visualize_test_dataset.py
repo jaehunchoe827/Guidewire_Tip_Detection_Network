@@ -68,40 +68,32 @@ def draw_circle(ax, center_xy: tuple, color: str, radius: float = 12.0) -> None:
                         edgecolor=color, linewidth=1.5))
 
 
-def select_samples(test_samples: list, num_optical: int, num_xray: int, seed: int) -> list:
-    optical = [s for s in test_samples if not GuidewireDataSet.is_xray_image(s[0])]
-    xray = [s for s in test_samples if GuidewireDataSet.is_xray_image(s[0])]
-    if len(optical) < num_optical or len(xray) < num_xray:
+def select_samples_by_modality(test_samples: list, modality: str, count: int,
+                                seed: int) -> list:
+    if modality == 'x-ray':
+        pool = [s for s in test_samples if GuidewireDataSet.is_xray_image(s[0])]
+    else:
+        pool = [s for s in test_samples if not GuidewireDataSet.is_xray_image(s[0])]
+    if len(pool) < count:
         raise ValueError(
-            f"Not enough samples: optical={len(optical)} (need {num_optical}), "
-            f"xray={len(xray)} (need {num_xray})")
+            f"Not enough {modality} samples: have {len(pool)}, need {count}")
     rng = random.Random(seed)
-    selected = [(s, 'optical') for s in rng.sample(optical, num_optical)]
-    selected += [(s, 'x-ray') for s in rng.sample(xray, num_xray)]
-    return selected
+    return [(s, modality) for s in rng.sample(pool, count)]
 
 
-def visualize(config: dict, config_name: str, num_optical: int, num_xray: int,
-              seed: int) -> str:
+def render_figure(config: dict, model, samples: list, output_path: str) -> str:
+    """Render one figure (one row per sample, four columns) for the given
+    (sample, modality) list and save it to output_path."""
     output_size = tuple(config['network']['input_image_shape'])  # (H, W)
     from_logits = config.get('from_logits', True)
 
-    dataset_path = os.path.join(project_root, 'datasets', 'guidewire')
-    preprocessor = GuidewireDataPreprocessor(dir_dataset=dataset_path,
-                                             split_ratio=config['dataset']['split_ratio'])
-    test_samples = preprocessor.get_data_sample_names('test')
-    selected = select_samples(test_samples, num_optical, num_xray, seed)
-
     # Dataset that reproduces exactly what the network is fed at test time
     # (skip_xray_default_noise=True: x-ray images are not given synthetic noise).
-    selected_paths = [s for s, _ in selected]
+    selected_paths = [s for s, _ in samples]
     input_dataset = GuidewireDataSet(selected_paths, apply_augmentation=False,
                                      config=config, skip_xray_default_noise=True)
 
-    model = build_test_model(config)
-    model.eval()
-
-    n_rows = len(selected)
+    n_rows = len(samples)
     n_cols = 4
     cell_in = 3.0  # size of each image cell, in inches
     col_gap_in = COL_GAP / 72.0
@@ -118,7 +110,7 @@ def visualize(config: dict, config_name: str, num_optical: int, num_xray: int,
         ax.axis('off')
         return ax
 
-    for row_index, ((image_path, label_path), modality) in enumerate(selected):
+    for row_index, ((image_path, label_path), modality) in enumerate(samples):
         raw_resized = load_raw_image_resized(image_path, output_size)
 
         image_std, gt_heatmap = input_dataset[row_index]  # (H, W, 1), (H, W)
@@ -156,20 +148,39 @@ def visualize(config: dict, config_name: str, num_optical: int, num_xray: int,
         ax.imshow(raw_resized)
         draw_circle(ax, pred_xy, color='lime')
 
-    output_dir = os.path.join(project_root, 'results', config_name, 'test')
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'test_dataset_visualization.png')
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     print(f"Saved visualization to {output_path}")
     return output_path
 
 
+def visualize(config: dict, config_name: str, num_optical: int, num_xray: int,
+              seed: int) -> list:
+    dataset_path = os.path.join(project_root, 'datasets', 'guidewire')
+    preprocessor = GuidewireDataPreprocessor(dir_dataset=dataset_path,
+                                             split_ratio=config['dataset']['split_ratio'])
+    test_samples = preprocessor.get_data_sample_names('test')
+
+    optical_samples = select_samples_by_modality(test_samples, 'optical', num_optical, seed)
+    xray_samples = select_samples_by_modality(test_samples, 'x-ray', num_xray, seed)
+
+    model = build_test_model(config)
+    model.eval()
+
+    output_dir = os.path.join(project_root, 'results', config_name, 'test')
+    optical_path = render_figure(config, model, optical_samples,
+                                 os.path.join(output_dir, 'test_dataset_visualization_optical.png'))
+    xray_path = render_figure(config, model, xray_samples,
+                              os.path.join(output_dir, 'test_dataset_visualization_xray.png'))
+    return [optical_path, xray_path]
+
+
 def main():
     parser = ArgumentParser(description='Visualize model predictions on test samples.')
     parser.add_argument('--config', default='default.yaml', type=str)
-    parser.add_argument('--num_optical', default=3, type=int)
-    parser.add_argument('--num_xray', default=2, type=int)
+    parser.add_argument('--num_optical', default=5, type=int)
+    parser.add_argument('--num_xray', default=5, type=int)
     parser.add_argument('--seed', default=6, type=int,
                         help='seed for selecting which test samples to visualize')
     args = parser.parse_args()
