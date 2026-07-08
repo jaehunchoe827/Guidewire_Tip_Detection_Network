@@ -179,9 +179,9 @@ def visualize(config: dict, config_name: str, num_optical: int, num_xray: int,
 def main():
     parser = ArgumentParser(description='Visualize model predictions on test samples.')
     parser.add_argument('--config', default='default.yaml', type=str)
-    parser.add_argument('--num_optical', default=5, type=int)
-    parser.add_argument('--num_xray', default=5, type=int)
-    parser.add_argument('--seed', default=6, type=int,
+    parser.add_argument('--num_optical', default=4, type=int)
+    parser.add_argument('--num_xray', default=4, type=int)
+    parser.add_argument('--seed', default=777, type=int,
                         help='seed for selecting which test samples to visualize')
     args = parser.parse_args()
 
