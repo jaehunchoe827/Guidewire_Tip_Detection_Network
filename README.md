@@ -1,4 +1,15 @@
-# Guidewire Tip Detection Network.
+# Guidewire Tip Detection Network
+
+GWTD is a deep network that detects the guidewire tip in fluoroscopic (X-ray) images.
+Given an input image, it predicts a heatmap over the tip location, from which the tip
+position is recovered. The model couples a YOLOv11 backbone with a custom heatmap
+detection head (trained with a combined BCE + MSE objective and an optional edge-assist
+branch), and is trained with an extensive set of X-ray-specific data augmentations for
+robustness.
+
+The dataset is composed of both fluoroscopic (X-ray) and optical images. To make the
+optical images resemble X-ray images, they are converted to grayscale and corrupted with
+Gaussian noise that mimics X-ray noise.
 
 > This implementation is based on jahongir7174's [YOLOv11-pt](https://github.com/jahongir7174/YOLOv11-pt)
 
@@ -21,11 +32,11 @@ This repo was tested on Ubuntu 22.04.5 (test environment: i9-14900K + RTX 5090 +
 
 1. Download the pre-trained parameters and dataset:
    ```bash
-   curl -L "https://www.dropbox.com/scl/fi/hakd3tw5znmxiqr4m6mww/magposenet_pretrained.tar?rlkey=5bbnto6ezzvjssp67h6idjqsr&st=7zrko0ey&dl=1" -o gwtd_pretrained.tar
+   curl -L "https://www.dropbox.com/scl/fi/qx705igztzpmo6q0y1022/gwtd_pretrained.tar.gz?rlkey=awih37nfiequtdvhp141ec3e1&st=9ttdgcfe&dl=0" -o gwtd_pretrained.tar.gz
    ```
 2. Extract the archive:
    ```bash
-   tar --strip-components=1 -xvf gwtd_pretrained.tar
+   tar --strip-components=1 -xvf gwtd_pretrained.tar.gz
    ```
 3. Run the test:
    ```bash
